@@ -1,0 +1,29 @@
+{
+  "name": "slower",
+  "version": "1.0.0",
+  "description": "Adapts the pace of your requests to the resource's feedback",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha --exit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lcneves/slower.git"
+  },
+  "keywords": [
+    "rate-limit",
+    "resource",
+    "throttle",
+    "throttling",
+    "throttler"
+  ],
+  "author": "Lucas Neves <lcneves@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/lcneves/slower/issues"
+  },
+  "homepage": "https://github.com/lcneves/slower#readme",
+  "devDependencies": {
+    "mocha": "^6.1.3"
+  }
+}
