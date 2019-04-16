@@ -9,25 +9,61 @@
 
 class Slower {
   constructor (options) {
+    function parseTime (t) {
+      if (typeof t === 'number' && t >= 0)
+        return t;
+
+      try {
+        const ms
+          = t.endsWith('h') ? parseInt(ms.slice(0, -1), 10) * 3600000
+          : t.endsWith('m') ? parseInt(ms.slice(0, -1), 10) * 60000
+          : t.endsWith('s') ? parseInt(ms.slice(0, -1), 10) * 1000
+          : t.endsWith('ms') ? parseInt(ms.slice(0, -2), 10)
+          : null;
+
+        if (typeof ms !== 'number' || ms < 0)
+          throw new Error();
+      } catch (err) {
+        throw new Error('Invalid time format!\n' + t);
+      }
+    }
+
     if (!options || typeof options !== 'object')
       throw new Error('Parameter must be an object!');
 
     if (typeof options.task !== 'function')
       throw new Error('Parameter "task" must be a function!');
 
-    if (opts.regimes !== undefined && !Array.isArray(opts.regimes))
-      throw new Error('Parameter "regimes", if passed, must be Array!');
-
     for (let f of [ 'errorHandler', 'timeoutHandler' ]) {
       if (options[f] && typeof options[f] !== 'function')
         throw new Error(`Parameter "${f}", if passed, must be a function!`);
     }
 
+    for (let p of [
+      'minInterval',
+      'baseInterval',
+      'maxInterval',
+      'fasterAfter',
+      'delayOnFailure',
+    ]) {
+      if (opts[p] !== undefined)
+        opts[p] = parseTime(opts[p]);
+    }
+
     const opts = {
-      errorHandler: (err) => console.error(err),
+      errorHandler: (err) => {
+        if (err.message === '__timeout')
+          console.info('Task has timed out!');
+        else
+          console.error(err)
+      },
       timeoutHandler: opts.errorHandler,
       taskTimeLimit: null,
-      regimes: [ { } ],
+      minInterval: 0,
+      baseInterval: 1000,
+      maxInterval: 60000,
+      fasterAfter: 60000,
+      delayOnFailure: 0,
       ...options
     };
 
@@ -36,13 +72,19 @@ class Slower {
       timeoutHandler: opts.timeoutHandler,
       task: opts.task,
       taskTimeLimit: opts.taskTimeout,
-      regimes: opts.regimes,
-    }
+      delayOnFailure: opts.delayOnFailure,
+      minInterval: opts.minInterval,
+      baseInterval: opts.baseInterval,
+      maxInterval: opts.maxInterval,
+      window: opts.window,
+    };
 
     this._state = {
-      regime: this._props.regimes[0],
+      currentInterval: opts.baseInterval,
+      maxRateLimit: opts.minInterval,
       isRunning: false,
       hasPendingTask: false,
+      hasFailure: false,
       lastRun: new Date(0),
       restartTimeout: null,
       nextRunTimeout: null,
@@ -94,22 +136,24 @@ class Slower {
       })
       .catch(err => {
         if (err.message === '__timeout')
-          self.timeoutHandler(err);
+          p.timeoutHandler(err);
         else
-          self.errorHandler(err)
+          p.errorHandler(err)
       })
       .finally(() => {
         clearTimeout(s.taskTimeout);
 
         if (s.isRunning) {
           const duration = new Date() - s.lastRun;
-          const delay = duration < s.regime.interval
-            ? s.regime.interval - duration : 0;
+          const delay = s.regime.interval - duration;
+          if (s.hasFailure) delay += p.delayOnFailure;
+          delay = Math.max(delay, 0);
 
           s.nextRunTimeout = setTimeout(() => self._run(), delay);
         }
 
         s.hasPendingTask = false;
+        s.hasFailure = false;
       });
   }
 
