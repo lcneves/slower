@@ -55,13 +55,13 @@ class Slower {
         if (err.message === '__timeout')
           console.info('Task has timed out!');
         else
-          console.error(err)
+          console.error(err);
       },
       timeoutHandler: opts.errorHandler,
       taskTimeLimit: null,
       minInterval: 0,
-      baseInterval: 1000,
-      maxInterval: 60000,
+      baseInterval: 1000, // 1 second
+      maxInterval: 60000, // 1 minute
       fasterAfter: 60000,
       delayOnFailure: 0,
       ...options
@@ -77,26 +77,48 @@ class Slower {
       baseInterval: opts.baseInterval,
       maxInterval: opts.maxInterval,
       window: opts.window,
+      forgetLimit: 180000000, // 5 hours
     };
 
     this._state = {
       currentInterval: opts.baseInterval,
-      maxRateLimit: opts.minInterval,
+      rateLimited: opts.minInterval,
       isRunning: false,
       hasPendingTask: false,
       hasFailure: false,
       lastRun: new Date(0),
+      lastRateLimit: new Date(0),
       restartTimeout: null,
       nextRunTimeout: null,
       taskTimeout: null,
+    };
+
+    this.status = {
+      ok: 0,
+      rateLimited: 1,
+      failure: 2,
     };
 
     if (opts.startImmediately)
       this.start();
   }
 
-  _updateRegime (status) {
-    //TODO
+  _updateInterval (statusCode) {
+    const now = new Date();
+    const [ s, p ] = [ this._state, this._props ];
+
+    switch (statusCode) {
+      case this.status.ok:
+        if (p.forgetLimit && p.forgetLimit
+        if (now - s.lastRateLimit >= p.window)
+          s.currentInterval = (s.currentInterval + s.rateLimited) / 2;
+        break;
+      case this.status.rateLimited:
+        break;
+      case this.status.failure:
+        break;
+      default:
+        throw new Error('Invalid status code: ' + statusCode);
   }
 
   stop () {
@@ -160,6 +182,7 @@ class Slower {
   start () {
     this.stop();
     this._state.isRunning = true;
+    this._state.lastRateLimit = new Date();
     this._run();
   }
 }
